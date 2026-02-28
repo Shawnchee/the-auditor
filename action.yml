@@ -105,15 +105,14 @@ runs:
         pip install --quiet slither-analyzer solc-select
         solc-select install 0.8.28 && solc-select use 0.8.28
 
-    # ── Step 2: Install Aderyn (pre-built binary) ──────────
+    # ── Step 2: Install Aderyn (official installer) ──────────
     - name: Install Aderyn
       shell: bash
       run: |
-        ADERYN_VERSION="0.3.6"
-        echo "Downloading Aderyn v${ADERYN_VERSION}..."
-        curl -sL "https://github.com/Cyfrin/aderyn/releases/download/aderyn-v${ADERYN_VERSION}/aderyn-linux-amd64" -o /usr/local/bin/aderyn
-        chmod +x /usr/local/bin/aderyn
-        echo "Aderyn installed: $(aderyn --version)"
+        echo "Installing Aderyn via official installer..."
+        curl --proto '=https' --tlsv1.2 -LsSf https://github.com/cyfrin/aderyn/releases/download/aderyn-v0.6.8/aderyn-installer.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        echo "Aderyn installed: $(aderyn --version 2>/dev/null || echo 'will be available in next step')"
 
     # ── Step 3: Install cargo-audit (pre-built) ────────────
     - name: Install cargo-audit
