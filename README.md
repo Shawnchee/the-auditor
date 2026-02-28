@@ -79,6 +79,25 @@ jobs:
         uses: Shawnchee/the-auditor@v1
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+
+          # ── Fail behaviour ──────────────────────────────────
+          # Fails the check (❌) when HIGH or CRITICAL vulnerabilities are found.
+          # Developers can still merge unless you mark this check as Required
+          # in Settings → Branches → Branch Protection Rules.
+          # Set to 'false' for report-only mode (check always passes).
+          fail_on_findings: "true"
+
+          # ── Raw tool output (optional) ──────────────────────
+          # Posts a second PR comment with the unprocessed JSON output
+          # from Slither, Aderyn, and cargo-audit. Useful for debugging
+          # or for teams who want to see the raw data alongside the AI review.
+          # include_raw_output: "true"
+
+          # ── Other options (uncomment to use) ────────────────
+          # gemini_model: "gemini-2.5-pro"          # Upgrade model for deeper analysis
+          # severity_threshold: "medium"             # Only surface medium+ findings
+          # exclude_paths: "test/**,mocks/**"        # Skip test/mock contracts
+          # custom_prompt: "This is a DeFi lending protocol. Focus on reentrancy and flash loan attacks."
 ```
 
 **That's it!** PR Auditor will now run on every PR that touches your smart contracts.
@@ -98,7 +117,7 @@ jobs:
 | `aderyn_args` | No | `""` | Extra arguments for Aderyn |
 | `cargo_audit_args` | No | `""` | Extra arguments for cargo-audit |
 | `severity_threshold` | No | `low` | Minimum severity to report: `low`, `medium`, `high`, `critical` |
-| `fail_on_findings` | No | `false` | Set to `true` to fail the action when vulnerabilities are found |
+| `fail_on_findings` | No | `true` | Fails the check when **HIGH or CRITICAL** vulnerabilities are found. Set to `false` for report-only mode |
 | `custom_prompt` | No | `""` | Additional instructions for the Gemini reviewer |
 | `include_paths` | No | `""` | Comma-separated globs of paths to include |
 | `exclude_paths` | No | `""` | Comma-separated globs of paths to exclude |
@@ -306,6 +325,18 @@ PR Auditor is designed to be resilient:
 | **cargo-audit fails** | Logs warning, continues with other tools |
 | **No contract files found** | Exits cleanly with security score 100 |
 | **No Cargo.toml for Rust** | Skips cargo-audit gracefully |
+
+### Merge Behaviour
+
+By default, PR Auditor **posts a report but does not block merges**. You have three options:
+
+| Mode | Config | What Happens |
+|:---|:---|:---|
+| **Report only** (default) | `fail_on_findings: "false"` | ✅ Check always passes. Developers review the comment and decide. |
+| **Warn** (recommended) | `fail_on_findings: "true"` | ❌ Check shows a red X when vulnerabilities are found, but developers can still merge. |
+| **Hard block** | `fail_on_findings: "true"` + Required check | ❌ Developers **cannot merge** until all findings are resolved. |
+
+> **To enable "Hard block":** Go to your repo → Settings → Branches → Branch protection rules → check **"Require status checks to pass"** → add the `Security Audit / PR Auditor` check.
 
 ---
 
