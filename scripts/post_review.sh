@@ -159,8 +159,15 @@ post_review() {
       local repo="${GITHUB_REPOSITORY}"
       local api_url="https://api.github.com/repos/${repo}/issues/${pr_number}/comments"
 
+      # Write comment body to temp file to avoid shell ARG_MAX limit
+      local tmp_comment
+      tmp_comment=$(mktemp /tmp/pr-comment-XXXX.txt)
+      echo -e "$comment_body" > "$tmp_comment"
+
       local comment_payload
-      comment_payload=$(jq -n --arg body "$(echo -e "$comment_body")" '{"body": $body}')
+      comment_payload=$(jq -n --rawfile body "$tmp_comment" '{"body": $body}')
+      rm -f "$tmp_comment"
+
 
       local post_response
       post_response=$(curl -s -w "\n%{http_code}" \
