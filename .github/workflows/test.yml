@@ -34,3 +34,10 @@ jobs:
           severity_threshold: "low"
           fail_on_findings: "false"
           include_raw_output: "true"
+          custom_prompt: >
+            Before flagging reentrancy, carefully read the actual source code
+            and verify the exact order of operations. If the state update
+            (e.g. balances[msg.sender] -= amount) occurs BEFORE the external
+            call, it is NOT a reentrancy vulnerability — it correctly follows
+            the Checks-Effects-Interactions pattern. Only flag reentrancy if
+            the external call genuinely precedes the state update.
