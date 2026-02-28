@@ -92,6 +92,45 @@ That's it. PR Auditor will now run on every PR.
 
 </details>
 
+### Configuration Examples
+
+Add these to the `with:` section of your workflow step.
+
+#### 1. DeFi Protocol (Solidity)
+Focus on deep security auditing and skip non-critical findings.
+
+```yaml
+      - uses: Shawnchee/the-auditor@v1
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          severity_threshold: "medium"
+          slither_args: "--exclude naming-convention" # Pass extra args to Slither
+          exclude_paths: "test/**,mocks/**,scripts/**"
+          custom_prompt: "This is a DeFi lending protocol. Focus on reentrancy, flash loan attacks, and oracle manipulation."
+```
+
+#### 2. Solana / Anchor (Rust)
+Audit programs in specific directories.
+
+```yaml
+      - uses: Shawnchee/the-auditor@v1
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          include_paths: "programs/**"
+          custom_prompt: "This is a Solana program using Anchor. Focus on account validation and PDA security."
+```
+
+#### 3. Report Only (No Job Failure)
+Ideal for adding to existing repos without blocking CI initially.
+
+```yaml
+      - uses: Shawnchee/the-auditor@v1
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          fail_on_findings: "false"
+          include_raw_output: "true" # Post extra tool details
+```
+
 ### Merge Behaviour
 
 | Mode | Config | Effect |
@@ -130,7 +169,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 3. Commit and push
 4. Open a Pull Request
 
-For technical docs (architecture, error handling, project structure), see **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+For technical docs (architecture, tagging/versioning, project structure), see **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** and **[docs/TAGGING_GUIDE.md](docs/TAGGING_GUIDE.md)**.
 
 ---
 

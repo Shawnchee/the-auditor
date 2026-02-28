@@ -60,6 +60,7 @@ To work on PR Auditor locally, you will need:
 3. Ensure your `Dockerfile` still builds correctly.
 4. Update the `README.md` if you changed any inputs or outputs in `action.yml`.
 5. Open a Pull Request against the `main` branch.
+6. Once merged, follow the [Tagging Guide](docs/TAGGING_GUIDE.md) to update the release tags.
 
 ---
 
