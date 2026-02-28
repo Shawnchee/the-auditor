@@ -45,7 +45,6 @@ post_review() {
 
   # ── Build the PR comment body ──────────────────────────────
   local score_emoji="🟢"
-  local score_bar=""
   if [[ "$security_score" -ge 80 ]]; then
     score_emoji="🟢"
   elif [[ "$security_score" -ge 60 ]]; then
@@ -191,9 +190,12 @@ post_review() {
     echo -e "$comment_body"
   fi
 
-  # ── Fail the action if configured and findings exist ───────
-  if [[ "$fail_on_findings" == "true" && "$total" -gt 0 ]]; then
-    err "Failing action: $total vulnerabilities found (fail_on_findings=true)."
-    exit 1
+  # ── Fail the action if configured ──────────────────────────
+  if [[ "$fail_on_findings" == "true" ]]; then
+    if [[ "$critical" -gt 0 || "$high" -gt 0 ]]; then
+      err "Failing action: found ${critical} CRITICAL and ${high} HIGH vulnerability(s) (fail_on_findings=true)."
+      err "Review the PR comment above for details and recommendations."
+      exit 1
+    fi
   fi
 }

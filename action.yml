@@ -42,9 +42,9 @@ inputs:
     default: "low"
 
   fail_on_findings:
-    description: "If 'true', the action will exit with a non-zero code when vulnerabilities are found."
+    description: "If 'true', the action will exit with a non-zero code when there are HIGH or CRITICAL vulnerabilities."
     required: false
-    default: "false"
+    default: "true"
 
   custom_prompt:
     description: "Optional additional instructions for the Gemini AI reviewer (e.g., 'Focus on reentrancy and access control')."
