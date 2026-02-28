@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 2026-02-28
+
+### Documentation
+- **Configuration Guides:** Added detailed examples for Solidity and Rust workflows in the README.
+- **Versioning:** Published a new `TAGGING_GUIDE.md` to manage stable and floating release tags.
+- **Contributor Docs:** Linked specialized guides in `CONTRIBUTING.md`.
+
 ## [1.0.0] - 2026-02-28
 
 Initial release of **PR Auditor**.
