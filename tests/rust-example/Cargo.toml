@@ -1,24 +1,8 @@
 [package]
-name = "vulnerable-token"
+name = "safe-token"
 version = "0.1.0"
 edition = "2021"
 
-# ⚠️  These are DELIBERATELY pinned to versions with known CVEs.
-# DO NOT use these in production. This file exists to test PR Auditor's
-# cargo-audit integration.
 [dependencies]
-
-# RUSTSEC-2022-0011: sodiumoxide — unmaintained, potential memory unsafety
-sodiumoxide = "0.2.7"
-
-# RUSTSEC-2021-0073: crossbeam-deque — unsound use of std::mem::uninitialized()
-crossbeam-deque = "0.7.3"
-
-# RUSTSEC-2020-0159: chrono — localtime_r segfault (CVSS 6.2 HIGH)
-chrono = "0.4.19"
-
-# RUSTSEC-2023-0052: webpki — CPU DoS via certificate parsing
-webpki = "0.22.0"
-
-# RUSTSEC-2021-0079: crossbeam-channel — unsound Send impl
-crossbeam-channel = "0.5.0"
+serde = "1"
+serde_json = "1"
