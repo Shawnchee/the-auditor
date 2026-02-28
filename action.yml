@@ -1,0 +1,88 @@
+name: "The Auditor PR Reviewer"
+description: "Automatically audits Solidity, Move, and Rust smart contracts on every PR using Slither, Aderyn, Cargo-Audit, and Gemini"
+author: "Shawnchee"
+
+branding:
+  icon: "shield"
+  color: "blue"
+
+inputs:
+  gemini_api_key:
+    description: "Google Gemini API key for AI-powered analysis."
+    required: true
+
+  gemini_model:
+    description: "Gemini model to use for analysis."
+    required: false
+    default: "gemini-2.5-flash"
+
+  github_token:
+    description: "GitHub token for posting PR review comments. Defaults to the automatic GITHUB_TOKEN."
+    required: false
+    default: ${{ github.token }}
+
+  slither_args:
+    description: "Additional arguments to pass to Slither (e.g., '--exclude naming-convention')."
+    required: false
+    default: ""
+
+  aderyn_args:
+    description: "Additional arguments to pass to Aderyn."
+    required: false
+    default: ""
+
+  cargo_audit_args:
+    description: "Additional arguments to pass to cargo-audit."
+    required: false
+    default: ""
+
+  severity_threshold:
+    description: "Minimum severity to report: 'low', 'medium', 'high', or 'critical'."
+    required: false
+    default: "low"
+
+  fail_on_findings:
+    description: "If 'true', the action will exit with a non-zero code when vulnerabilities are found."
+    required: false
+    default: "false"
+
+  custom_prompt:
+    description: "Optional additional instructions for the Gemini AI reviewer (e.g., 'Focus on reentrancy and access control')."
+    required: false
+    default: ""
+
+  include_paths:
+    description: "Comma-separated glob patterns of paths to include (e.g., 'contracts/**,src/**'). Defaults to all supported files."
+    required: false
+    default: ""
+
+  exclude_paths:
+    description: "Comma-separated glob patterns of paths to exclude (e.g., 'test/**,mocks/**')."
+    required: false
+    default: ""
+
+outputs:
+  vulnerability_count:
+    description: "Total number of vulnerabilities found across all tools and chains."
+
+  critical_count:
+    description: "Number of critical-severity findings."
+
+  high_count:
+    description: "Number of high-severity findings."
+
+  medium_count:
+    description: "Number of medium-severity findings."
+
+  low_count:
+    description: "Number of low/informational findings."
+
+  security_score:
+    description: "Overall security score from 0–100 calculated by PR Auditor."
+
+  report_url:
+    description: "URL of the posted PR review comment (if applicable)."
+
+runs:
+  using: "docker"
+  image: "Dockerfile"

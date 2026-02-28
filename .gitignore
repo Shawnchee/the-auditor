@@ -1,0 +1,8 @@
+node_modules/
+target/
+build/
+artifacts/
+cache/
+*.log
+.env
+.env.local
