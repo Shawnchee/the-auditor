@@ -4,6 +4,9 @@
 # Orchestrates detection → analysis → Gemini review → PR comment (upon PRs only, able to be configured in your .yml file)
 set -euo pipefail
 
+# Scripts directory (set by action.yml, fallback for local testing
+SCRIPTS_DIR="${SCRIPTS_DIR:-$(cd "$(dirname "$0")/scripts" && pwd)}"
+
 # ── Colours & helpers ────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -42,7 +45,7 @@ fi
 
 # ── Step 1: Detect contract languages ────────────────────────
 log "🔍 Detecting smart contract files..."
-source /scripts/detect.sh
+source "$SCRIPTS_DIR/detect.sh"
 detect_contracts "$WORKSPACE" "$INCLUDE_PATHS" "$EXCLUDE_PATHS"
 
 if [[ "$HAS_SOLIDITY" == "false" && "$HAS_RUST" == "false" && "$HAS_MOVE" == "false" ]]; then
@@ -71,7 +74,7 @@ COMBINED_REPORT=""
 # --- Solidity: Slither ---
 if [[ "$HAS_SOLIDITY" == "true" ]]; then
   log "🐍 Running Slither (Solidity static analysis)..."
-  source /scripts/run_slither.sh
+  source "$SCRIPTS_DIR/run_slither.sh"
   if run_slither "$WORKSPACE" "$SLITHER_ARGS" "$REPORT_DIR/slither.json"; then
     ok "Slither completed."
     COMBINED_REPORT+="$(cat "$REPORT_DIR/slither.json")"
@@ -82,7 +85,7 @@ if [[ "$HAS_SOLIDITY" == "true" ]]; then
 
   # --- Solidity: Aderyn ---
   log "🦅 Running Aderyn (Solidity static analysis)..."
-  source /scripts/run_aderyn.sh
+  source "$SCRIPTS_DIR/run_aderyn.sh"
   if run_aderyn "$WORKSPACE" "$ADERYN_ARGS" "$REPORT_DIR/aderyn.json"; then
     ok "Aderyn completed."
     COMBINED_REPORT+="$(cat "$REPORT_DIR/aderyn.json")"
@@ -95,7 +98,7 @@ fi
 # --- Rust / Move: cargo-audit ---
 if [[ "$HAS_RUST" == "true" || "$HAS_MOVE" == "true" ]]; then
   log "🦀 Running cargo-audit (Rust/Move dependency audit)..."
-  source /scripts/run_cargo_audit.sh
+  source "$SCRIPTS_DIR/run_cargo_audit.sh"
   if run_cargo_audit "$WORKSPACE" "$CARGO_AUDIT_ARGS" "$REPORT_DIR/cargo_audit.json"; then
     ok "cargo-audit completed."
     COMBINED_REPORT+="$(cat "$REPORT_DIR/cargo_audit.json")"
@@ -119,7 +122,7 @@ fi
 
 # ── Step 5: Send to Gemini for AI review ─────────────────────
 log "🤖 Sending reports to Gemini ($GEMINI_MODEL) for AI-powered review..."
-source /scripts/gemini_review.sh
+source "$SCRIPTS_DIR/gemini_review.sh"
 gemini_review \
   "$GEMINI_API_KEY" \
   "$GEMINI_MODEL" \
@@ -131,7 +134,7 @@ gemini_review \
 
 # ── Step 6: Parse results & post PR comment ──────────────────
 log "📝 Posting review to PR..."
-source /scripts/post_review.sh
+source "$SCRIPTS_DIR/post_review.sh"
 post_review \
   "$GITHUB_TOKEN" \
   "$REPORT_DIR/gemini_review.json" \

@@ -64,25 +64,93 @@ inputs:
 outputs:
   vulnerability_count:
     description: "Total number of vulnerabilities found across all tools and chains."
+    value: ${{ steps.audit.outputs.vulnerability_count }}
 
   critical_count:
     description: "Number of critical-severity findings."
+    value: ${{ steps.audit.outputs.critical_count }}
 
   high_count:
     description: "Number of high-severity findings."
+    value: ${{ steps.audit.outputs.high_count }}
 
   medium_count:
     description: "Number of medium-severity findings."
+    value: ${{ steps.audit.outputs.medium_count }}
 
   low_count:
     description: "Number of low/informational findings."
+    value: ${{ steps.audit.outputs.low_count }}
 
   security_score:
-    description: "Overall security score from 0–100 calculated by PR Auditor."
+    description: "Overall security score from 0-100 calculated by PR Auditor."
+    value: ${{ steps.audit.outputs.security_score }}
 
   report_url:
     description: "URL of the posted PR review comment (if applicable)."
+    value: ${{ steps.audit.outputs.report_url }}
 
 runs:
-  using: "docker"
-  image: "Dockerfile"
+  using: "composite"
+  steps:
+    # ── Step 1: Install Python + Slither ───────────────────
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install Slither & solc
+      shell: bash
+      run: |
+        pip install --quiet slither-analyzer solc-select
+        solc-select install 0.8.28 && solc-select use 0.8.28
+
+    # ── Step 2: Install Aderyn (pre-built binary) ──────────
+    - name: Install Aderyn
+      shell: bash
+      run: |
+        ADERYN_VERSION="0.3.6"
+        echo "Downloading Aderyn v${ADERYN_VERSION}..."
+        curl -sL "https://github.com/Cyfrin/aderyn/releases/download/aderyn-v${ADERYN_VERSION}/aderyn-linux-amd64" -o /usr/local/bin/aderyn
+        chmod +x /usr/local/bin/aderyn
+        echo "Aderyn installed: $(aderyn --version)"
+
+    # ── Step 3: Install cargo-audit (pre-built) ────────────
+    - name: Install cargo-audit
+      shell: bash
+      run: |
+        CARGO_AUDIT_VERSION="0.21.1"
+        echo "Downloading cargo-audit v${CARGO_AUDIT_VERSION}..."
+        curl -sL "https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv${CARGO_AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-musl-v${CARGO_AUDIT_VERSION}.tgz" | tar xz -C /tmp
+        mv /tmp/cargo-audit-x86_64-unknown-linux-musl-v${CARGO_AUDIT_VERSION}/cargo-audit /usr/local/bin/cargo-audit
+        chmod +x /usr/local/bin/cargo-audit
+        echo "cargo-audit installed: $(cargo-audit --version)"
+
+    # ── Step 4: Install jq (usually pre-installed) ─────────
+    - name: Ensure jq is available
+      shell: bash
+      run: |
+        if ! command -v jq &> /dev/null; then
+          sudo apt-get update && sudo apt-get install -y jq
+        fi
+
+    # ── Step 5: Run the audit ──────────────────────────────
+    - name: Run PR Auditor
+      id: audit
+      shell: bash
+      env:
+        INPUT_GEMINI_API_KEY: ${{ inputs.gemini_api_key }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github_token }}
+        INPUT_GEMINI_MODEL: ${{ inputs.gemini_model }}
+        INPUT_SLITHER_ARGS: ${{ inputs.slither_args }}
+        INPUT_ADERYN_ARGS: ${{ inputs.aderyn_args }}
+        INPUT_CARGO_AUDIT_ARGS: ${{ inputs.cargo_audit_args }}
+        INPUT_SEVERITY_THRESHOLD: ${{ inputs.severity_threshold }}
+        INPUT_FAIL_ON_FINDINGS: ${{ inputs.fail_on_findings }}
+        INPUT_CUSTOM_PROMPT: ${{ inputs.custom_prompt }}
+        INPUT_INCLUDE_PATHS: ${{ inputs.include_paths }}
+        INPUT_EXCLUDE_PATHS: ${{ inputs.exclude_paths }}
+        SCRIPTS_DIR: ${{ github.action_path }}/scripts
+      run: |
+        chmod +x ${{ github.action_path }}/entrypoint.sh ${{ github.action_path }}/scripts/*.sh
+        bash ${{ github.action_path }}/entrypoint.sh

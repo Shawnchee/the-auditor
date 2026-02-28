@@ -312,8 +312,7 @@ PR Auditor is designed to be resilient:
 
 ```
 the-auditor/
-├── action.yml              # GitHub Action metadata & branding
-├── Dockerfile              # Multi-stage build (Slither + Aderyn + cargo-audit)
+├── action.yml              # Composite GitHub Action (installs tools + runs audit)
 ├── entrypoint.sh           # Main orchestration script
 ├── scripts/
 │   ├── detect.sh           # Smart contract file detection
@@ -322,9 +321,12 @@ the-auditor/
 │   ├── run_cargo_audit.sh  # cargo-audit runner (Rust/Move)
 │   ├── gemini_review.sh    # Gemini AI review integration
 │   └── post_review.sh      # PR comment builder & poster
+├── tests/
+│   └── [add your test contract here for testing]
 ├── .github/
 │   └── workflows/
 │       └── test.yml        # Self-test CI workflow
+├── CONTRIBUTING.md
 ├── README.md
 ├── LICENSE
 └── .gitignore
@@ -334,7 +336,7 @@ the-auditor/
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please feel free to submit a Pull Request. For more detailed instructions, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)

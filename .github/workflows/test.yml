@@ -7,7 +7,6 @@ on:
       - "**/*.rs"
       - "**/*.move"
       - "scripts/**"
-      - "Dockerfile"
       - "entrypoint.sh"
       - "action.yml"
   push:
@@ -27,31 +26,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run The Auditor
+      - name: Run PR Auditor
         uses: ./
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           severity_threshold: "low"
           fail_on_findings: "false"
-
-  docker-build:
-    name: "Docker Build Test"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build Docker Image
-        run: docker build -t the-auditor:test .
-
-      - name: Verify Image Size
-        run: |
-          SIZE=$(docker image inspect the-auditor:test --format='{{.Size}}')
-          SIZE_MB=$((SIZE / 1024 / 1024))
-          echo "Image size: ${SIZE_MB}MB"
-          if [ $SIZE_MB -gt 500 ]; then
-            echo "Image is larger than 500MB ($SIZE_MB MB)"
-          else
-            echo "Image size is acceptable ($SIZE_MB MB)"
-          fi
