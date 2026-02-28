@@ -1,7 +1,7 @@
 # PR Auditor – Multi-stage Docker Build
 
 # build Aderyn from source
-FROM rust:1.78-slim-bookworm AS aderyn-builder
+FROM rust:1.82-slim-bookworm AS aderyn-builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git pkg-config libssl-dev && \
@@ -32,9 +32,9 @@ RUN pip install --no-cache-dir slither-analyzer solc-select
 RUN solc-select install 0.8.28 && solc-select use 0.8.28
 
 # Install cargo-audit for Move / Rust smart contracts
-COPY --from=rust:1.78-slim-bookworm /usr/local/cargo/bin/rustup /usr/local/bin/rustup
-COPY --from=rust:1.78-slim-bookworm /usr/local/rustup /usr/local/rustup
-COPY --from=rust:1.78-slim-bookworm /usr/local/cargo /usr/local/cargo
+COPY --from=rust:1.82-slim-bookworm /usr/local/cargo/bin/rustup /usr/local/bin/rustup
+COPY --from=rust:1.82-slim-bookworm /usr/local/rustup /usr/local/rustup
+COPY --from=rust:1.82-slim-bookworm /usr/local/cargo /usr/local/cargo
 ENV PATH="/usr/local/cargo/bin:${PATH}"
 ENV RUSTUP_HOME="/usr/local/rustup"
 ENV CARGO_HOME="/usr/local/cargo"
