@@ -31,7 +31,7 @@ EOF
     if [ "$TOTAL" -gt 0 ] 2>/dev/null; then
       printf '| Impact | Detector | Description |\n' >> "$TMP_BODY"
       printf '|--------|----------|-------------|\n' >> "$TMP_BODY"
-      jq -r '.results.detectors[]? | "| \(.impact) | `\(.check)` | \(.description | split("\n")[0] | .[0:100]) |"' \
+      jq -r '.results.detectors[]? | "| \(.impact) | `\(.check)` | \(.description | split("\n")[0]) |"' \
         "$report_dir/slither.json" 2>/dev/null | head -30 >> "$TMP_BODY" || true
       printf '\n\n' >> "$TMP_BODY"
     fi

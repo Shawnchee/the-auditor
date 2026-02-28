@@ -177,13 +177,19 @@ post_review() {
       comment_payload=$(jq -n --rawfile body "$tmp_comment" '{"body": $body}')
       rm -f "$tmp_comment"
 
+      # Write payload to file to avoid ARG_MAX on large reviews
+      local tmp_payload
+      tmp_payload=$(mktemp /tmp/pr-payload-XXXX.json)
+      echo "$comment_payload" > "$tmp_payload"
+
       local post_response
       post_response=$(curl -sS -w "\n%{http_code}" \
         -X POST \
         -H "Authorization: token $github_token" \
         -H "Accept: application/vnd.github.v3+json" \
-        -d "$comment_payload" \
+        -d "@$tmp_payload" \
         "$api_url")
+      rm -f "$tmp_payload"
 
       local post_code
       post_code=$(echo "$post_response" | tail -n 1)

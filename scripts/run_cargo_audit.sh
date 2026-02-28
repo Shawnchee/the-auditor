@@ -41,7 +41,7 @@ run_cargo_audit() {
 
     # Handle CVSS 4.0 parse error — remove the unsupported advisory entries and retry
     if echo "$stderr_content" | grep -q "unsupported CVSS version"; then
-      warn "  Advisory DB contains CVSS 4.0 entries. Removing them and retrying..."
+      warn "  Advisory DB contains CVSS 4.0 entries. Removing them and retrying with --no-fetch..."
 
       # Find and remove advisory files that use CVSS 4.0 format
       local advisory_db_path="$HOME/.cargo/advisory-db"
@@ -50,21 +50,14 @@ run_cargo_audit() {
         cvss4_files=$(grep -rl "CVSS:4.0" "$advisory_db_path" 2>/dev/null || true)
         if [[ -n "$cvss4_files" ]]; then
           echo "$cvss4_files" | xargs rm -f 2>/dev/null || true
-          log "  Removed $(echo "$cvss4_files" | wc -l) CVSS 4.0 advisory files. Retrying..."
+          log "  Removed $(echo "$cvss4_files" | wc -l) CVSS 4.0 advisory file(s)."
         fi
       fi
 
-      # Retry with the cleaned advisory DB
+      # Retry with --no-fetch so cargo-audit doesn't re-download the deleted files
       exit_code=0
-      result=$(cd "$manifest_dir" && eval "$audit_cmd" 2>/tmp/cargo_audit_stderr.log) || exit_code=$?
+      result=$(cd "$manifest_dir" && eval "$audit_cmd --no-fetch" 2>/tmp/cargo_audit_stderr.log) || exit_code=$?
       stderr_content=$(cat /tmp/cargo_audit_stderr.log 2>/dev/null || true)
-
-      # If it STILL fails on CVSS, use --no-fetch as last resort
-      if echo "$stderr_content" | grep -q "unsupported CVSS version"; then
-        warn "  Still failing. Trying with --no-fetch..."
-        exit_code=0
-        result=$(cd "$manifest_dir" && eval "$audit_cmd --no-fetch" 2>/dev/null) || exit_code=$?
-      fi
     fi
 
     # cargo-audit exits 1 when vulnerabilities are found — expected, not an error

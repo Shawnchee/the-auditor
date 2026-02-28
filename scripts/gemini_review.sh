@@ -126,7 +126,13 @@ SYSTEM_PROMPT
 
   rm -f "$tmp_system" "$tmp_user"
 
-  log "  Calling Gemini API ($model)..."
+  # Write payload to file — avoids ARG_MAX when tool output is large
+  local tmp_payload
+  tmp_payload=$(mktemp /tmp/gemini-payload-XXXX.json)
+  echo "$payload" > "$tmp_payload"
+  local payload_size
+  payload_size=$(wc -c < "$tmp_payload")
+  log "  Calling Gemini API ($model)... (payload: ${payload_size} bytes)"
 
   local response
   local http_code
@@ -136,7 +142,7 @@ SYSTEM_PROMPT
   while [[ $retry_count -lt $max_retries ]]; do
     response=$(curl -s -w "\n%{http_code}" \
       -H "Content-Type: application/json" \
-      -d "$payload" \
+      -d "@$tmp_payload" \
       "$api_url" 2>/dev/null)
 
     http_code=$(echo "$response" | tail -n 1)
@@ -152,6 +158,8 @@ SYSTEM_PROMPT
       sleep $((retry_count * 2))
     fi
   done
+
+  rm -f "$tmp_payload"
 
   if [[ "$http_code" != "200" ]]; then
     err "  Gemini API failed after $max_retries retries (HTTP $http_code)."
