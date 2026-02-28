@@ -36,12 +36,23 @@ run_cargo_audit() {
     fi
 
     local result
+    # First attempt: normal run
     if result=$(cd "$manifest_dir" && eval "$audit_cmd" 2>/tmp/cargo_audit_stderr.log); then
-      combined_results=$(echo "$combined_results" | jq --argjson r "$result" '.audits += [$r]')
+      if echo "$result" | jq '.' >/dev/null 2>&1; then
+        combined_results=$(echo "$combined_results" | jq --argjson r "$result" '.audits += [$r]')
+      fi
     else
       local exit_code=$?
-      # cargo-audit returns non-zero when vulnerabilities are found
-      if [[ -n "$result" ]]; then
+      local stderr_content=$(cat /tmp/cargo_audit_stderr.log 2>/dev/null || true)
+
+      # Check if it's the CVSS 4.0 parsing error
+      if echo "$stderr_content" | grep -q "unsupported CVSS version"; then
+        warn "  Advisory DB has CVSS 4.0 entries (unsupported by cargo-audit). Retrying with --stale..."
+        result=$(cd "$manifest_dir" && eval "$audit_cmd --stale" 2>/dev/null) || true
+      fi
+
+      # cargo-audit returns non-zero when vulnerabilities are found — that's OK
+      if [[ -n "$result" ]] && echo "$result" | jq '.' >/dev/null 2>&1; then
         combined_results=$(echo "$combined_results" | jq --argjson r "$result" '.audits += [$r]')
       else
         warn "  cargo-audit failed for $manifest (exit $exit_code)"
