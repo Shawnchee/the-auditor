@@ -45,7 +45,6 @@ post_review() {
 
   # ── Build the PR comment body ──────────────────────────────
   local score_emoji="🟢"
-  local score_bar=""
   if [[ "$security_score" -ge 80 ]]; then
     score_emoji="🟢"
   elif [[ "$security_score" -ge 60 ]]; then
@@ -160,16 +159,37 @@ post_review() {
       local repo="${GITHUB_REPOSITORY}"
       local api_url="https://api.github.com/repos/${repo}/issues/${pr_number}/comments"
 
+      # Write comment body to temp file to avoid shell ARG_MAX limit
+      local tmp_comment
+      tmp_comment=$(mktemp /tmp/pr-comment-XXXX.txt)
+      echo -e "$comment_body" > "$tmp_comment"
+
+      # Truncate if exceeding GitHub's 65536 byte comment limit
+      local body_size
+      body_size=$(wc -c < "$tmp_comment")
+      if [[ "$body_size" -ge 65536 ]]; then
+        warn "  Comment is ${body_size} bytes, truncating to 65000..."
+        truncate -s 65000 "$tmp_comment"
+        printf '\n\n---\n⚠️ *[Output truncated — exceeded GitHub 65KB comment limit]*\n' >> "$tmp_comment"
+      fi
+
       local comment_payload
-      comment_payload=$(jq -n --arg body "$(echo -e "$comment_body")" '{"body": $body}')
+      comment_payload=$(jq -n --rawfile body "$tmp_comment" '{"body": $body}')
+      rm -f "$tmp_comment"
+
+      # Write payload to file to avoid ARG_MAX on large reviews
+      local tmp_payload
+      tmp_payload=$(mktemp /tmp/pr-payload-XXXX.json)
+      echo "$comment_payload" > "$tmp_payload"
 
       local post_response
-      post_response=$(curl -s -w "\n%{http_code}" \
+      post_response=$(curl -sS -w "\n%{http_code}" \
         -X POST \
         -H "Authorization: token $github_token" \
         -H "Accept: application/vnd.github.v3+json" \
-        -d "$comment_payload" \
+        -d "@$tmp_payload" \
         "$api_url")
+      rm -f "$tmp_payload"
 
       local post_code
       post_code=$(echo "$post_response" | tail -n 1)
@@ -180,7 +200,8 @@ post_review() {
         ok "  Review posted to PR #${pr_number}"
         echo "report_url=$comment_url" >> "$GITHUB_OUTPUT"
       else
-        warn "  Failed to post PR comment (HTTP $post_code). Comment body saved to $review_file."
+        warn "  Failed to post PR comment (HTTP $post_code)."
+        echo "$post_response" | sed '$d' >&2
       fi
     else
       warn "  Could not determine PR number. Printing review to stdout."
@@ -191,9 +212,12 @@ post_review() {
     echo -e "$comment_body"
   fi
 
-  # ── Fail the action if configured and findings exist ───────
-  if [[ "$fail_on_findings" == "true" && "$total" -gt 0 ]]; then
-    err "Failing action: $total vulnerabilities found (fail_on_findings=true)."
-    exit 1
+  # ── Fail the action if configured ──────────────────────────
+  if [[ "$fail_on_findings" == "true" ]]; then
+    if [[ "$critical" -gt 0 || "$high" -gt 0 ]]; then
+      err "Failing action: found ${critical} CRITICAL and ${high} HIGH vulnerability(s) (fail_on_findings=true)."
+      err "Review the PR comment above for details and recommendations."
+      exit 1
+    fi
   fi
 }

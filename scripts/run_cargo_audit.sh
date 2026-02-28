@@ -18,12 +18,11 @@ run_cargo_audit() {
 
   if [[ -z "$cargo_manifests" ]]; then
     warn "  No Cargo.toml found. Skipping cargo-audit."
-    echo '{"vulnerabilities": [], "warnings": []}' > "$output_file"
+    echo '{"tool": "cargo-audit", "audits": [], "notes": []}' > "$output_file"
     return 0
   fi
 
-  local combined_results='{"tool": "cargo-audit", "audits": []}'
-  local has_error=false
+  local combined_results='{"tool": "cargo-audit", "audits": [], "notes": []}'
 
   while IFS= read -r manifest; do
     local manifest_dir
@@ -35,25 +34,49 @@ run_cargo_audit() {
       audit_cmd+=" $extra_args"
     fi
 
-    local result
-    if result=$(cd "$manifest_dir" && eval "$audit_cmd" 2>/tmp/cargo_audit_stderr.log); then
+    local result stderr_content exit_code
+    exit_code=0
+    result=$(cd "$manifest_dir" && eval "$audit_cmd" 2>/tmp/cargo_audit_stderr.log) || exit_code=$?
+    stderr_content=$(cat /tmp/cargo_audit_stderr.log 2>/dev/null || true)
+
+    # Handle CVSS 4.0 parse error — remove the unsupported advisory entries and retry
+    if echo "$stderr_content" | grep -q "unsupported CVSS version"; then
+      warn "  Advisory DB contains CVSS 4.0 entries. Removing them and retrying with --no-fetch..."
+
+      # Find and remove advisory files that use CVSS 4.0 format
+      local advisory_db_path="$HOME/.cargo/advisory-db"
+      if [[ -d "$advisory_db_path" ]]; then
+        local cvss4_files
+        cvss4_files=$(grep -rl "CVSS:4.0" "$advisory_db_path" 2>/dev/null || true)
+        if [[ -n "$cvss4_files" ]]; then
+          echo "$cvss4_files" | xargs rm -f 2>/dev/null || true
+          log "  Removed $(echo "$cvss4_files" | wc -l) CVSS 4.0 advisory file(s)."
+        fi
+      fi
+
+      # Retry with --no-fetch so cargo-audit doesn't re-download the deleted files
+      exit_code=0
+      result=$(cd "$manifest_dir" && eval "$audit_cmd --no-fetch" 2>/tmp/cargo_audit_stderr.log) || exit_code=$?
+      stderr_content=$(cat /tmp/cargo_audit_stderr.log 2>/dev/null || true)
+    fi
+
+    # cargo-audit exits 1 when vulnerabilities are found — expected, not an error
+    if [[ -n "$result" ]] && echo "$result" | jq '.' >/dev/null 2>&1; then
       combined_results=$(echo "$combined_results" | jq --argjson r "$result" '.audits += [$r]')
     else
-      local exit_code=$?
-      # cargo-audit returns non-zero when vulnerabilities are found
-      if [[ -n "$result" ]]; then
-        combined_results=$(echo "$combined_results" | jq --argjson r "$result" '.audits += [$r]')
-      else
-        warn "  cargo-audit failed for $manifest (exit $exit_code)"
-        has_error=true
-      fi
+      warn "  cargo-audit produced no parseable output for $manifest (exit ${exit_code})"
+      local err_entry
+      err_entry=$(jq -n --arg m "$manifest" --arg e "${stderr_content:0:500}" '{
+        "manifest": $m,
+        "error": $e,
+        "status": "failed"
+      }')
+      combined_results=$(echo "$combined_results" | jq --argjson n "$err_entry" '.notes += [$n]')
     fi
   done <<< "$cargo_manifests"
 
+  # Always write valid JSON — Gemini needs something to review even if the tool failed
   echo "$combined_results" | jq '.' > "$output_file"
-
-  if [[ "$has_error" == "true" && ! -s "$output_file" ]]; then
-    return 1
-  fi
+  ok "  cargo-audit completed."
   return 0
 }

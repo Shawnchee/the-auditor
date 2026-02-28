@@ -42,15 +42,16 @@ detect_contracts() {
   fi
 
   # Detect Rust files (.rs) — indicates Solana or general Rust contracts
-  local rs_files
+  local rs_files cargo_tomls
   rs_files=$(eval "$find_cmd -name '*.rs'" 2>/dev/null || true)
-  if [[ -n "$rs_files" ]]; then
-    # Check if there's a Cargo.toml (confirms it's a Rust project)
-    if [[ -f "$workspace/Cargo.toml" ]]; then
-      HAS_RUST="true"
-      RS_FILE_COUNT=$(echo "$rs_files" | wc -l)
-      log "  Found $RS_FILE_COUNT Rust file(s) with Cargo.toml"
-    fi
+  cargo_tomls=$(find "$workspace" -name "Cargo.toml" \
+    -not -path "*/target/*" \
+    -not -path "*/.git/*" \
+    2>/dev/null || true)
+  if [[ -n "$rs_files" && -n "$cargo_tomls" ]]; then
+    HAS_RUST="true"
+    RS_FILE_COUNT=$(echo "$rs_files" | wc -l)
+    log "  Found $RS_FILE_COUNT Rust file(s)"
   fi
 
   # Detect Move files (.move)

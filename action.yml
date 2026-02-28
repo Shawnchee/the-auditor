@@ -42,9 +42,9 @@ inputs:
     default: "low"
 
   fail_on_findings:
-    description: "If 'true', the action will exit with a non-zero code when vulnerabilities are found."
+    description: "If 'true', the action will exit with a non-zero code when there are HIGH or CRITICAL vulnerabilities."
     required: false
-    default: "false"
+    default: "true"
 
   custom_prompt:
     description: "Optional additional instructions for the Gemini AI reviewer (e.g., 'Focus on reentrancy and access control')."
@@ -60,6 +60,11 @@ inputs:
     description: "Comma-separated glob patterns of paths to exclude (e.g., 'test/**,mocks/**')."
     required: false
     default: ""
+
+  include_raw_output:
+    description: "If 'true', posts a second PR comment with the raw unprocessed output from Slither, Aderyn, and cargo-audit."
+    required: false
+    default: "false"
 
 outputs:
   vulnerability_count:
@@ -105,15 +110,14 @@ runs:
         pip install --quiet slither-analyzer solc-select
         solc-select install 0.8.28 && solc-select use 0.8.28
 
-    # ── Step 2: Install Aderyn (pre-built binary) ──────────
+    # ── Step 2: Install Aderyn (official installer) ──────────
     - name: Install Aderyn
       shell: bash
       run: |
-        ADERYN_VERSION="0.3.6"
-        echo "Downloading Aderyn v${ADERYN_VERSION}..."
-        curl -sL "https://github.com/Cyfrin/aderyn/releases/download/aderyn-v${ADERYN_VERSION}/aderyn-linux-amd64" -o /usr/local/bin/aderyn
-        chmod +x /usr/local/bin/aderyn
-        echo "Aderyn installed: $(aderyn --version)"
+        echo "Installing Aderyn via official installer..."
+        curl --proto '=https' --tlsv1.2 -LsSf https://github.com/cyfrin/aderyn/releases/download/aderyn-v0.6.8/aderyn-installer.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        echo "Aderyn installed: $(aderyn --version 2>/dev/null || echo 'will be available in next step')"
 
     # ── Step 3: Install cargo-audit (pre-built) ────────────
     - name: Install cargo-audit
@@ -154,3 +158,14 @@ runs:
       run: |
         chmod +x ${{ github.action_path }}/entrypoint.sh ${{ github.action_path }}/scripts/*.sh
         bash ${{ github.action_path }}/entrypoint.sh
+
+    # ── Step 6 (Optional): Post raw tool summary ───────────
+    - name: Post Raw Tool Summary
+      if: inputs.include_raw_output == 'true' && always()
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        GITHUB_EVENT_PATH: ${{ github.event_path }}
+      run: |
+        source ${{ github.action_path }}/scripts/post_raw_summary.sh
+        post_raw_summary "$GH_TOKEN" /tmp/auditor-reports

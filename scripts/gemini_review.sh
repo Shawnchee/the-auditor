@@ -21,8 +21,24 @@ You are "PR Auditor", an expert smart contract security reviewer. You have been 
 2. **Classify severity** — Assign each finding one of: CRITICAL, HIGH, MEDIUM, LOW, INFORMATIONAL.
 3. **Provide context** — Explain WHY each finding matters, referencing the project's business logic when possible.
 4. **Suggest fixes** — Give actionable, code-level remediation for each finding.
-5. **Calculate a Security Score** — A number from 0 (critical vulnerabilities) to 100 (clean).
-6. **Remove false positives** — Use the project context to filter out findings that are clearly intentional or benign.
+5. **Remove false positives** — Use the project context to filter out findings that are clearly intentional or benign.
+
+6. **Calculate a Security Score using this STRICT formula:**
+   Start at 100 and subtract penalties:
+   - Each CRITICAL finding:      -25 points
+   - Each HIGH finding:          -15 points
+   - Each MEDIUM finding:         -5 points
+   - Each LOW finding:            -2 points
+   - Each INFORMATIONAL finding:  -1 point
+   The minimum score is 0. Never give a score above 100.
+   
+   Examples:
+   - 0 findings = 100
+   - 1 CRITICAL + 2 HIGH = 100 - 25 - 30 = 45
+   - 3 HIGH + 2 MEDIUM = 100 - 45 - 10 = 45
+   - 1 LOW + 2 INFO = 100 - 2 - 2 = 96
+
+   IMPORTANT: Do NOT override this formula. Apply it mechanically.
 
 Respond ONLY with valid JSON in this exact schema:
 {
@@ -79,11 +95,19 @@ SYSTEM_PROMPT
   # ── Call Gemini API ──────────────────────────────────────
   local api_url="https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${api_key}"
 
-  # Build the request payload
+  # Write prompts to temp files to avoid shell argument length limits
+  # (large tool outputs easily exceed Linux's ~2MB ARG_MAX)
+  local tmp_system tmp_user
+  tmp_system=$(mktemp /tmp/gemini-system-XXXX.txt)
+  tmp_user=$(mktemp /tmp/gemini-user-XXXX.txt)
+  printf '%s' "$system_prompt" > "$tmp_system"
+  printf '%s' "$user_prompt"   > "$tmp_user"
+
+  # Build request payload using --rawfile (reads file contents as string, no arg limit)
   local payload
   payload=$(jq -n \
-    --arg system "$system_prompt" \
-    --arg user "$user_prompt" \
+    --rawfile system "$tmp_system" \
+    --rawfile user   "$tmp_user" \
     '{
       "system_instruction": {
         "parts": [{"text": $system}]
@@ -100,7 +124,15 @@ SYSTEM_PROMPT
       }
     }')
 
-  log "  Calling Gemini API ($model)..."
+  rm -f "$tmp_system" "$tmp_user"
+
+  # Write payload to file — avoids ARG_MAX when tool output is large
+  local tmp_payload
+  tmp_payload=$(mktemp /tmp/gemini-payload-XXXX.json)
+  echo "$payload" > "$tmp_payload"
+  local payload_size
+  payload_size=$(wc -c < "$tmp_payload")
+  log "  Calling Gemini API ($model)... (payload: ${payload_size} bytes)"
 
   local response
   local http_code
@@ -110,7 +142,7 @@ SYSTEM_PROMPT
   while [[ $retry_count -lt $max_retries ]]; do
     response=$(curl -s -w "\n%{http_code}" \
       -H "Content-Type: application/json" \
-      -d "$payload" \
+      -d "@$tmp_payload" \
       "$api_url" 2>/dev/null)
 
     http_code=$(echo "$response" | tail -n 1)
@@ -126,6 +158,8 @@ SYSTEM_PROMPT
       sleep $((retry_count * 2))
     fi
   done
+
+  rm -f "$tmp_payload"
 
   if [[ "$http_code" != "200" ]]; then
     err "  Gemini API failed after $max_retries retries (HTTP $http_code)."
