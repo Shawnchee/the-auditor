@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.28;
 
 /// @title SimpleVault
-/// @notice A minimal, secure ETH vault with proper access control and reentrancy protection.
+/// @notice A minimal, secure ETH vault with reentrancy guard and access control.
 contract SimpleVault {
     address public immutable owner;
     mapping(address => uint256) public balances;
+
+    bool private _locked;
 
     event Deposited(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount);
@@ -13,10 +15,13 @@ contract SimpleVault {
     error InsufficientBalance();
     error TransferFailed();
     error ZeroAmount();
+    error ReentrantCall();
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Not owner");
+    modifier noReenter() {
+        if (_locked) revert ReentrantCall();
+        _locked = true;
         _;
+        _locked = false;
     }
 
     constructor() {
@@ -29,10 +34,10 @@ contract SimpleVault {
         emit Deposited(msg.sender, msg.value);
     }
 
-    function withdraw(uint256 amount) external {
+    function withdraw(uint256 amount) external noReenter {
         if (balances[msg.sender] < amount) revert InsufficientBalance();
 
-        // State update BEFORE external call (checks-effects-interactions)
+        // Checks-Effects-Interactions: state update BEFORE external call
         balances[msg.sender] -= amount;
 
         (bool success, ) = msg.sender.call{value: amount}("");
