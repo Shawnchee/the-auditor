@@ -4,7 +4,7 @@
 # Orchestrates detection → analysis → Gemini review → PR comment (upon PRs only, able to be configured in your .yml file)
 set -euo pipefail
 
-# Scripts directory (set by action.yml, fallback for local testing
+# Scripts directory (set by action.yml, fallback for local testing)
 SCRIPTS_DIR="${SCRIPTS_DIR:-$(cd "$(dirname "$0")/scripts" && pwd)}"
 
 # ── Colours & helpers ────────────────────────────────────────
