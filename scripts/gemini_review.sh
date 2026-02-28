@@ -95,11 +95,19 @@ SYSTEM_PROMPT
   # ── Call Gemini API ──────────────────────────────────────
   local api_url="https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${api_key}"
 
-  # Build the request payload
+  # Write prompts to temp files to avoid shell argument length limits
+  # (large tool outputs easily exceed Linux's ~2MB ARG_MAX)
+  local tmp_system tmp_user
+  tmp_system=$(mktemp /tmp/gemini-system-XXXX.txt)
+  tmp_user=$(mktemp /tmp/gemini-user-XXXX.txt)
+  printf '%s' "$system_prompt" > "$tmp_system"
+  printf '%s' "$user_prompt"   > "$tmp_user"
+
+  # Build request payload using --rawfile (reads file contents as string, no arg limit)
   local payload
   payload=$(jq -n \
-    --arg system "$system_prompt" \
-    --arg user "$user_prompt" \
+    --rawfile system "$tmp_system" \
+    --rawfile user   "$tmp_user" \
     '{
       "system_instruction": {
         "parts": [{"text": $system}]
@@ -115,6 +123,8 @@ SYSTEM_PROMPT
         "responseMimeType": "application/json"
       }
     }')
+
+  rm -f "$tmp_system" "$tmp_user"
 
   log "  Calling Gemini API ($model)..."
 
