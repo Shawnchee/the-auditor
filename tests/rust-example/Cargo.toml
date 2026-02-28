@@ -1,0 +1,13 @@
+[package]
+name = "vulnerable-token"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Known vulnerable crate versions (cargo-audit will flag these)
+hyper = "0.14.18"           # CVE-2023-26964: HTTP/2 DoS
+tokio = "1.17.0"            # Older version with known issues
+serde_json = "1.0.91"       # Included for context
+chrono = "0.4.23"           # RUSTSEC-2020-0159: localtime_r segfault
+regex = "1.7.0"             # Older version
+smallvec = "1.10.0"         # Historical CVEs on smallvec
