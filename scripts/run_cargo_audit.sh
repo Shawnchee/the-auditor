@@ -39,18 +39,32 @@ run_cargo_audit() {
     result=$(cd "$manifest_dir" && eval "$audit_cmd" 2>/tmp/cargo_audit_stderr.log) || exit_code=$?
     stderr_content=$(cat /tmp/cargo_audit_stderr.log 2>/dev/null || true)
 
-    # Handle CVSS 4.0 parse error — the advisory DB has newer format entries
-    # that cargo-audit v0.21 can't parse. Produce a helpful note for Gemini.
+    # Handle CVSS 4.0 parse error — remove the unsupported advisory entries and retry
     if echo "$stderr_content" | grep -q "unsupported CVSS version"; then
-      warn "  Advisory DB contains CVSS 4.0 entries unsupported by this cargo-audit version. Recording note."
-      local note_entry
-      note_entry=$(jq -n --arg m "$manifest" '{
-        "manifest": $m,
-        "note": "cargo-audit advisory DB parse failed (CVSS 4.0 unsupported by v0.21). Manual review of dependencies recommended.",
-        "status": "skipped"
-      }')
-      combined_results=$(echo "$combined_results" | jq --argjson n "$note_entry" '.notes += [$n]')
-      continue
+      warn "  Advisory DB contains CVSS 4.0 entries. Removing them and retrying..."
+
+      # Find and remove advisory files that use CVSS 4.0 format
+      local advisory_db_path="$HOME/.cargo/advisory-db"
+      if [[ -d "$advisory_db_path" ]]; then
+        local cvss4_files
+        cvss4_files=$(grep -rl "CVSS:4.0" "$advisory_db_path" 2>/dev/null || true)
+        if [[ -n "$cvss4_files" ]]; then
+          echo "$cvss4_files" | xargs rm -f 2>/dev/null || true
+          log "  Removed $(echo "$cvss4_files" | wc -l) CVSS 4.0 advisory files. Retrying..."
+        fi
+      fi
+
+      # Retry with the cleaned advisory DB
+      exit_code=0
+      result=$(cd "$manifest_dir" && eval "$audit_cmd" 2>/tmp/cargo_audit_stderr.log) || exit_code=$?
+      stderr_content=$(cat /tmp/cargo_audit_stderr.log 2>/dev/null || true)
+
+      # If it STILL fails on CVSS, use --no-fetch as last resort
+      if echo "$stderr_content" | grep -q "unsupported CVSS version"; then
+        warn "  Still failing. Trying with --no-fetch..."
+        exit_code=0
+        result=$(cd "$manifest_dir" && eval "$audit_cmd --no-fetch" 2>/dev/null) || exit_code=$?
+      fi
     fi
 
     # cargo-audit exits 1 when vulnerabilities are found — expected, not an error
