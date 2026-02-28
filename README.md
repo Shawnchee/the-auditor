@@ -102,6 +102,7 @@ jobs:
 | `custom_prompt` | No | `""` | Additional instructions for the Gemini reviewer |
 | `include_paths` | No | `""` | Comma-separated globs of paths to include |
 | `exclude_paths` | No | `""` | Comma-separated globs of paths to exclude |
+| `include_raw_output` | No | `false` | Set to `true` to post a second PR comment with raw Slither/Aderyn/cargo-audit output |
 
 ### Secrets Setup
 
